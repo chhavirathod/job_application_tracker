@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Job Tracker</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <h1 class="title">Job Tracker</h1>
+      <button id="openDashboard" class="btn-icon" title="Open Dashboard">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="7" height="7"></rect>
+          <rect x="14" y="3" width="7" height="7"></rect>
+          <rect x="14" y="14" width="7" height="7"></rect>
+          <rect x="3" y="14" width="7" height="7"></rect>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Loading State -->
+    <div id="loadingState" class="loading-state">
+      <div class="spinner"></div>
+      <p>Detecting job details...</p>
+    </div>
+
+    <!-- Job Detected View -->
+    <div id="detectedView" class="view" style="display: none;">
+      <div class="detected-badge">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+          <polyline points="22 4 12 14.01 9 11.01"></polyline>
+        </svg>
+        <span>Job page detected</span>
+      </div>
+
+      <div class="form-group">
+        <label for="company">Company</label>
+        <input type="text" id="company" placeholder="e.g., Google" required>
+      </div>
+
+      <div class="form-group">
+        <label for="role">Role</label>
+        <input type="text" id="role" placeholder="e.g., Software Engineer Intern" required>
+      </div>
+
+      <div class="form-group">
+        <label for="resumeVersion">Resume Version (Optional)</label>
+        <input type="text" id="resumeVersion" placeholder="e.g., Resume_v2">
+      </div>
+
+      <div class="form-group">
+        <label for="status">Status</label>
+        <select id="status">
+          <option value="applied">Applied</option>
+          <option value="interview">Interview</option>
+          <option value="rejected">Rejected</option>
+          <option value="ghosted">Ghosted</option>
+        </select>
+      </div>
+
+      <button id="trackButton" class="btn-primary">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="20 6 9 17 4 12"></polyline>
+        </svg>
+        Track This Job
+      </button>
+    </div>
+
+    <!-- Already Tracked View -->
+    <div id="trackedView" class="view" style="display: none;">
+      <div class="alert alert-info">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="16" x2="12" y2="12"></line>
+          <line x1="12" y1="8" x2="12.01" y2="8"></line>
+        </svg>
+        <div>
+          <strong>Already tracked!</strong>
+          <p>This job is already in your tracker.</p>
+        </div>
+      </div>
+
+      <div class="tracked-info">
+        <div class="info-row">
+          <span class="label">Company:</span>
+          <span id="trackedCompany" class="value"></span>
+        </div>
+        <div class="info-row">
+          <span class="label">Role:</span>
+          <span id="trackedRole" class="value"></span>
+        </div>
+        <div class="info-row">
+          <span class="label">Status:</span>
+          <span id="trackedStatus" class="status-badge"></span>
+        </div>
+      </div>
+
+      <button id="viewInDashboard" class="btn-secondary">
+        View in Dashboard
+      </button>
+    </div>
+
+    <!-- Manual Entry View -->
+    <div id="manualView" class="view" style="display: none;">
+      <div class="alert alert-neutral">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="16" x2="12" y2="12"></line>
+          <line x1="12" y1="8" x2="12.01" y2="8"></line>
+        </svg>
+        <div>
+          <p>Not a job page? Add manually</p>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="manualCompany">Company *</label>
+        <input type="text" id="manualCompany" placeholder="e.g., Google" required>
+      </div>
+
+      <div class="form-group">
+        <label for="manualRole">Role *</label>
+        <input type="text" id="manualRole" placeholder="e.g., Software Engineer Intern" required>
+      </div>
+
+      <div class="form-group">
+        <label for="manualUrl">Job URL (Optional)</label>
+        <input type="url" id="manualUrl" placeholder="https://...">
+      </div>
+
+      <div class="form-group">
+        <label for="manualResumeVersion">Resume Version</label>
+        <input type="text" id="manualResumeVersion" placeholder="e.g., Resume_v2">
+      </div>
+
+      <div class="form-group">
+        <label for="manualStatus">Status</label>
+        <select id="manualStatus">
+          <option value="applied">Applied</option>
+          <option value="interview">Interview</option>
+          <option value="rejected">Rejected</option>
+          <option value="ghosted">Ghosted</option>
+        </select>
+      </div>
+
+      <button id="manualTrackButton" class="btn-primary">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="12" y1="5" x2="12" y2="19"></line>
+          <line x1="5" y1="12" x2="19" y2="12"></line>
+        </svg>
+        Add Application
+      </button>
+    </div>
+
+    <!-- Success View -->
+    <div id="successView" class="view" style="display: none;">
+      <div class="success-animation">
+        <svg class="checkmark" width="60" height="60" viewBox="0 0 60 60">
+          <circle cx="30" cy="30" r="28" fill="none" stroke="#10b981" stroke-width="3"/>
+          <path d="M15 30 L25 40 L45 20" fill="none" stroke="#10b981" stroke-width="3" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <h2 class="success-title">Application Tracked!</h2>
+      <p class="success-message">Your job application has been saved successfully.</p>
+      <button id="trackAnother" class="btn-secondary">Track Another Job</button>
+      <button id="viewDashboard" class="btn-link">View Dashboard</button>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <button id="toggleManual" class="btn-link">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="12" y1="5" x2="12" y2="19"></line>
+          <line x1="5" y1="12" x2="19" y2="12"></line>
+        </svg>
+        Add Manually
+      </button>
+    </div>
+  </div>
+
+  <script type="module" src="popup.js"></script>
+</body>
+</html>
