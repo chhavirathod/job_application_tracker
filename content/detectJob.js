@@ -191,6 +191,8 @@
   // Listen for messages from popup (with safety check)
   if (chrome.runtime && chrome.runtime.onMessage) {
     chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+      console.log('Content script received message:', message);
+      
       if (message.type === 'GET_JOB_DETAILS') {
         const jobDetails = {
           company: extractCompany(),
@@ -198,6 +200,8 @@
           jobUrl: window.location.href,
           isJobPage: isJobPage()
         };
+        
+        console.log('Sending job details:', jobDetails);
         sendResponse(jobDetails);
       }
       return true;

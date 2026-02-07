@@ -24,7 +24,7 @@ async function init() {
     // Get current tab
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     
-    if (!tab) {
+    if (!tab || !tab.id) {
       showManualView();
       return;
     }
@@ -36,18 +36,28 @@ async function init() {
       return;
     }
 
-    // Try to get job details from content script
-    try {
-      const response = await chrome.tabs.sendMessage(tab.id, { type: 'GET_JOB_DETAILS' });
-      
-      if (response && response.isJobPage) {
-        currentJobData = response;
-        showDetectedView(response);
-      } else {
-        showManualView();
+    // Try to get job details from content script with retry
+    let response = null;
+    let attempts = 0;
+    const maxAttempts = 3;
+    
+    while (attempts < maxAttempts && !response) {
+      try {
+        response = await chrome.tabs.sendMessage(tab.id, { type: 'GET_JOB_DETAILS' });
+        break;
+      } catch (error) {
+        attempts++;
+        if (attempts < maxAttempts) {
+          // Wait a bit before retrying (content script might still be loading)
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
       }
-    } catch (error) {
-      // Content script not ready or not a valid page
+    }
+    
+    if (response && response.isJobPage) {
+      currentJobData = response;
+      showDetectedView(response);
+    } else {
       showManualView();
     }
   } catch (error) {
@@ -58,6 +68,7 @@ async function init() {
 
 // Show detected job view
 function showDetectedView(jobData) {
+  console.log('Showing detected view with data:', jobData);
   hideAllViews();
   detectedView.style.display = 'block';
   
@@ -81,6 +92,7 @@ function showTrackedView(application) {
 
 // Show manual entry view
 function showManualView() {
+  console.log('Showing manual view');
   hideAllViews();
   manualView.style.display = 'block';
   loadingState.style.display = 'none';
