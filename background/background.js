@@ -1,5 +1,8 @@
 // Background service worker for the extension
 
+// Store detected jobs temporarily
+let detectedJobs = {};
+
 // Listen for installation
 chrome.runtime.onInstalled.addListener(async (details) => {
   if (details.reason === 'install') {
@@ -9,7 +12,8 @@ chrome.runtime.onInstalled.addListener(async (details) => {
     await chrome.storage.local.set({
       applications: [],
       settings: {
-        defaultStatus: 'applied'
+        defaultStatus: 'applied',
+        autoNotify: true
       }
     });
     
@@ -36,8 +40,8 @@ chrome.runtime.onInstalled.addListener(async (details) => {
 // Listen for messages from content scripts or popup
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'JOB_DETECTED') {
-    // Job page detected - could add badge or notification here
     console.log('Job page detected:', message.data);
+    handleJobDetected(message.data, sender.tab);
   }
   
   if (message.type === 'OPEN_DASHBOARD') {
@@ -46,8 +50,35 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     });
   }
   
+  if (message.type === 'GET_DETECTED_JOB') {
+    // Send back the detected job data for this tab
+    const tabId = sender.tab?.id || message.tabId;
+    sendResponse(detectedJobs[tabId] || null);
+  }
+  
   return true;
 });
+
+// Handle job detection
+async function handleJobDetected(jobData, tab) {
+  if (!tab || !tab.id) return;
+  
+  // Check if already tracked
+  const result = await chrome.storage.local.get(['applications']);
+  const applications = result.applications || [];
+  const alreadyTracked = applications.some(app => app.jobUrl === jobData.jobUrl);
+  
+  if (alreadyTracked) {
+    console.log('Job already tracked, skipping');
+    return;
+  }
+  
+  // Store detected job data
+  detectedJobs[tab.id] = jobData;
+  
+  // Just log the detection, no notification
+  console.log('Job detected and stored:', jobData);
+}
 
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   if (info.menuItemId === 'track-job') {
