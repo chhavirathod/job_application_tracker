@@ -29,13 +29,6 @@ async function init() {
       return;
     }
 
-    // Check if already tracked
-    const existing = await findByUrl(tab.url);
-    if (existing) {
-      showTrackedView(existing);
-      return;
-    }
-
     // Try to get job details from content script with retry
     let response = null;
     let attempts = 0;
@@ -54,6 +47,31 @@ async function init() {
       }
     }
     
+    // Check if this is a Smart Apply URL (shared URL across different jobs)
+    const isSmartApply = tab.url.includes('smartapply.indeed.com') || 
+                         tab.url.includes('smartapply.glassdoor.com') ||
+                         tab.url.includes('/indeedapply/') ||
+                         tab.url.includes('/apply/');
+    
+    // Check if already tracked
+    let existing = null;
+    
+    if (isSmartApply && response && response.company && response.role) {
+      // For Smart Apply: Match by company + role (not URL, since URL is shared)
+      console.log('Smart Apply detected - matching by company+role:', response.company, '+', response.role);
+      existing = await findByCompanyAndRole(response.company, response.role);
+    } else {
+      // For regular job pages: Match by URL
+      console.log('Regular job page - matching by URL:', tab.url);
+      existing = await findByUrl(tab.url);
+    }
+    
+    if (existing) {
+      console.log('Found existing application:', existing);
+      showTrackedView(existing);
+      return;
+    }
+
     if (response && response.isJobPage) {
       currentJobData = response;
       showDetectedView(response);
@@ -251,6 +269,21 @@ async function getApplications() {
 async function findByUrl(url) {
   const applications = await getApplications();
   return applications.find(app => app.jobUrl === url) || null;
+}
+
+async function findByCompanyAndRole(company, role) {
+  const applications = await getApplications();
+  
+  // Normalize strings for comparison (case-insensitive, trim whitespace)
+  const normalizedCompany = company.toLowerCase().trim();
+  const normalizedRole = role.toLowerCase().trim();
+  
+  return applications.find(app => {
+    const appCompany = (app.company || '').toLowerCase().trim();
+    const appRole = (app.role || '').toLowerCase().trim();
+    
+    return appCompany === normalizedCompany && appRole === normalizedRole;
+  }) || null;
 }
 
 function generateId() {

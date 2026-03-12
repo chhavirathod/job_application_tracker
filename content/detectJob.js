@@ -19,7 +19,9 @@
     /naukri\.com\/.*-jobs/i,
     /hirist\.tech\/.*-jobs/i,
     /hirist\.tech\/j\//i,
-    /wellfound\.com\/.*\/jobs/i,
+    /wellfound\.com\/jobs/i,  // Updated: matches /jobs?ref=... format
+    /wellfound\.com\/.*\/jobs/i,  // Keep for /company/xxx/jobs format
+    /angel\.co\/jobs/i,
     /angel\.co\/.*\/jobs/i,
     /instahyre\.com\/candidate\/opportunities/i,
     /angellist\.com\/jobs/i,
@@ -44,6 +46,22 @@
    */
   function isJobPage() {
     const url = window.location.href;
+    
+    // Smart Apply pages (Indeed/Glassdoor unified application)
+    if (url.includes('smartapply.indeed.com') || 
+        url.includes('smartapply.glassdoor.com') ||
+        url.includes('/indeedapply/')) {
+      
+      // Check if job header is present
+      const jobHeader = document.querySelector('.ia-JobHeader') ||
+                       document.querySelector('#ia-JobHeader-title') ||
+                       document.querySelector('[class*="JobHeader"]');
+      
+      if (jobHeader) {
+        console.log('Smart Apply page detected with job header');
+        return true;
+      }
+    }
     
     // Special handling for LinkedIn - only detect individual job pages, not job search/home
     if (url.includes('linkedin.com')) {
@@ -118,11 +136,14 @@
     
     // Glassdoor specific extraction
     if (url.includes('glassdoor.com')) {
+      // First try: Direct company selectors
       const selectors = [
         '.EmployerProfile_employerNameHeading__bXBYr h4',
+        '.EmployerProfile_compactEmployerName__9MGcV', // From job listing cards
         '[class*="EmployerProfile_employerName"] h4',
         '[class*="employerName"] h4',
-        '[data-test="employer-name"]'
+        '[data-test="employer-name"]',
+        '[data-testid="company-name"]'
       ];
       
       for (const selector of selectors) {
@@ -131,8 +152,34 @@
           let text = element.textContent || element.innerText || '';
           text = cleanText(text);
           if (text && text.toLowerCase() !== 'glassdoor' && text.length > 1) {
-            console.log('Found company via selector:', selector, '→', text);
+            console.log('Glassdoor: Found company via selector:', selector, '→', text);
             return text;
+          }
+        }
+      }
+      
+      // Second try: Combined "Company - Location" format (from job details page)
+      const combinedSelectors = [
+        '.css-1o18umh.e1wnkr790', // "Company - Location" span
+        '.ia-JobHeader-information span',
+        '[class*="JobHeader"] span[class*="wnkr"]'
+      ];
+      
+      for (const selector of combinedSelectors) {
+        const element = document.querySelector(selector);
+        if (element) {
+          let text = element.textContent || element.innerText || '';
+          text = cleanText(text);
+          
+          // Format: "SparkPlus Technologies - Remote" or "Company - Location"
+          // Extract company name (part before the dash)
+          const parts = text.split('-').map(p => p.trim());
+          if (parts.length >= 2 && parts[0].length > 1) {
+            const company = parts[0];
+            if (company.toLowerCase() !== 'glassdoor') {
+              console.log('Glassdoor: Found company from combined format:', selector, '→', company);
+              return company;
+            }
           }
         }
       }
@@ -163,8 +210,10 @@
     // Wellfound (AngelList) specific extraction
     if (url.includes('wellfound.com') || url.includes('angel.co')) {
       const selectors = [
+        'a[href*="/company/"] span.text-sm.font-semibold.text-black',  // ✨ NEW: From job page
         'a[href*="/company/"] span.inline.text-md.font-semibold',
         'a[href*="/company/"] .text-md.font-semibold',
+        'a[href*="/company/"] span.font-semibold',  // More generic
         '[data-test="Masthead"] a span.font-semibold',
         '[data-testid="startup-header"] a span'
       ];
@@ -175,7 +224,7 @@
           let text = element.textContent || element.innerText || '';
           text = cleanText(text);
           if (text && text.toLowerCase() !== 'wellfound' && text.toLowerCase() !== 'angellist' && text.length > 1) {
-            console.log('Found company via selector:', selector, '→', text);
+            console.log('Wellfound: Found company via selector:', selector, '→', text);
             return text;
           }
         }
@@ -225,6 +274,58 @@
         if (company && company.toLowerCase() !== 'linkedin' && company.length > 1) {
           console.log('Found company from page title:', company);
           return company;
+        }
+      }
+    }
+    
+    // Indeed specific extraction
+    if (url.includes('indeed.co')) {
+      // First try: Direct company selectors
+      const selectors = [
+        '[data-testid="company-name"]', // Primary selector from HTML
+        '[data-testid="inlineHeader-companyName"]',
+        '.css-19eicqx.eu4oa1w0', // From job card
+        '[class*="companyName"]',
+        '[data-company-name]',
+        '.jobsearch-CompanyInfoContainer a',
+        '.icl-u-lg-mr--sm.icl-u-xs-mr--xs'
+      ];
+      
+      for (const selector of selectors) {
+        const element = document.querySelector(selector);
+        if (element) {
+          let text = element.textContent || element.innerText || '';
+          text = cleanText(text);
+          if (text && text.toLowerCase() !== 'indeed' && text.length > 1 && text.length < 100) {
+            console.log('Indeed: Found company via selector:', selector, '→', text);
+            return text;
+          }
+        }
+      }
+      
+      // Second try: Combined "Company - Location" format (from job details page)
+      const combinedSelectors = [
+        '.css-1o18umh.e1wnkr790', // "Company - Location" span
+        '.ia-JobHeader-information span',
+        '[class*="JobHeader"] span[class*="wnkr"]'
+      ];
+      
+      for (const selector of combinedSelectors) {
+        const element = document.querySelector(selector);
+        if (element) {
+          let text = element.textContent || element.innerText || '';
+          text = cleanText(text);
+          
+          // Format: "Mypcot Infotech Private Limited - Sakinaka, Mumbai, Maharashtra"
+          // Extract company name (part before the dash)
+          const parts = text.split('-').map(p => p.trim());
+          if (parts.length >= 2 && parts[0].length > 1) {
+            const company = parts[0];
+            if (company.toLowerCase() !== 'indeed') {
+              console.log('Indeed: Found company from combined format:', selector, '→', company);
+              return company;
+            }
+          }
         }
       }
     }
@@ -312,6 +413,9 @@
     // Glassdoor specific extraction  
     if (url.includes('glassdoor.com')) {
       const selectors = [
+        '#ia-JobHeader-title',                                    // ✨ NEW: From job details page
+        '.ia-JobHeader-title',                                    // ✨ NEW: Class-based selector
+        'h1[id="ia-JobHeader-title"]',                           // ✨ NEW: Combined selector
         '#jd-job-title-1010021198085',
         '[id^="jd-job-title"]',
         '.heading_Level1__w42c9',
@@ -325,7 +429,35 @@
           let text = element.textContent || element.innerText || '';
           text = cleanText(text);
           if (text && text.length > 3) {
-            console.log('Found role via selector:', selector, '→', text);
+            console.log('Glassdoor: Found role via selector:', selector, '→', text);
+            return text;
+          }
+        }
+      }
+    }
+    
+    // Indeed specific extraction
+    if (url.includes('indeed.co')) {
+      const selectors = [
+        '#ia-JobHeader-title',                                    // ✨ NEW: From job details page  
+        '.ia-JobHeader-title',                                    // ✨ NEW: Class-based selector
+        'h1[id="ia-JobHeader-title"]',                           // ✨ NEW: Combined selector
+        '.jobTitle span[title]',                                  // Job title with title attribute
+        '.jobTitle span',
+        '[id*="jobTitle"]',
+        'h1.jobTitle',
+        'h2.jobTitle',
+        '.jcs-JobTitle span',
+        '[data-testid="jobTitle"]'
+      ];
+      
+      for (const selector of selectors) {
+        const element = document.querySelector(selector);
+        if (element) {
+          let text = element.textContent || element.innerText || element.getAttribute('title') || '';
+          text = cleanText(text);
+          if (text && text.length > 3 && text.length < 150) {
+            console.log('Indeed: Found role via selector:', selector, '→', text);
             return text;
           }
         }
@@ -357,12 +489,13 @@
     
     // Wellfound (AngelList) specific extraction
     if (url.includes('wellfound.com') || url.includes('angel.co')) {
-      // For Wellfound, job title is usually in the page title or h1
       const selectors = [
-        'h1',
+        'h1.inline.text-xl.font-semibold.text-black',  // ✨ NEW: Exact from HTML
+        'h1.text-xl.font-semibold',  // More generic version
+        'h1.font-semibold',  // Even more generic
+        'h1',  // Fallback
         '[data-test="job-title"]',
-        '.text-2xl',
-        '.font-bold'
+        '.text-2xl'
       ];
       
       for (const selector of selectors) {
@@ -370,8 +503,15 @@
         if (element) {
           let text = element.textContent || element.innerText || '';
           text = cleanText(text);
-          if (text && text.length > 3 && text.length < 200) {
-            console.log('Found role via selector:', selector, '→', text);
+          
+          // Filter out non-job-title h1s
+          const invalidTexts = ['apply to', 'about the company', 'recent jobs', 'funding', 'perks'];
+          const isValid = !invalidTexts.some(invalid => 
+            text.toLowerCase().includes(invalid)
+          );
+          
+          if (text && text.length > 3 && text.length < 200 && isValid) {
+            console.log('Wellfound: Found role via selector:', selector, '→', text);
             return text;
           }
         }
@@ -558,16 +698,224 @@
     detectAndExtract();
   }
   
-  // For dynamic pages like LinkedIn, run detection again after a delay
-  if (window.location.href.includes('linkedin.com')) {
+  // For dynamic pages (SPA - Single Page Applications)
+  const url = window.location.href;
+  
+  // LinkedIn: Watch for URL changes
+  if (url.includes('linkedin.com')) {
     setTimeout(detectAndExtract, 2000);
     
-    // Also watch for URL changes (LinkedIn is SPA)
     let lastUrl = window.location.href;
     const urlObserver = setInterval(() => {
       if (window.location.href !== lastUrl) {
         lastUrl = window.location.href;
         setTimeout(detectAndExtract, 1500);
+      }
+    }, 1000);
+  }
+  
+  // Glassdoor: Watch for job card clicks and job panel changes
+  if (url.includes('glassdoor.co')) {
+    setTimeout(detectAndExtract, 2000);
+    
+    // Track last job title to detect changes
+    let lastJobTitle = '';
+    
+    // Method 1: Watch for clicks on job cards
+    document.addEventListener('click', (event) => {
+      const jobCard = event.target.closest('[data-test="jobListing"]') || 
+                     event.target.closest('.JobCard_jobCardContainer__arQlW') ||
+                     event.target.closest('[class*="JobCard"]');
+      
+      if (jobCard) {
+        console.log('Glassdoor: Job card clicked, will re-extract in 1 second');
+        setTimeout(detectAndExtract, 1000);
+      }
+    }, true);
+    
+    // Method 2: Watch for DOM changes in the job details area
+    const observeJobDetails = () => {
+      const jobDetailsContainer = document.querySelector('#JDCol') || 
+                                 document.querySelector('[class*="JobDetails"]') ||
+                                 document.querySelector('.TwoColumnLayout_columnRight__f5C8s');
+      
+      if (jobDetailsContainer) {
+        const observer = new MutationObserver((mutations) => {
+          // Check if the job title changed
+          const currentTitle = extractRole();
+          if (currentTitle && currentTitle !== lastJobTitle && lastJobTitle !== '') {
+            console.log('Glassdoor: Job changed from', lastJobTitle, 'to', currentTitle);
+            lastJobTitle = currentTitle;
+            setTimeout(detectAndExtract, 500);
+          } else if (currentTitle && lastJobTitle === '') {
+            lastJobTitle = currentTitle;
+          }
+        });
+        
+        observer.observe(jobDetailsContainer, {
+          childList: true,
+          subtree: true,
+          characterData: true
+        });
+        
+        console.log('Glassdoor: Started observing job details panel for changes');
+      }
+    };
+    
+    // Start observing after page loads
+    setTimeout(observeJobDetails, 2000);
+  }
+  
+  // Indeed: Watch for job card clicks and job panel changes
+  if (url.includes('indeed.co')) {
+    setTimeout(detectAndExtract, 2000);
+    
+    // Track last job title to detect changes
+    let lastJobTitle = '';
+    
+    // Method 1: Watch for clicks on job cards
+    document.addEventListener('click', (event) => {
+      const jobCard = event.target.closest('.job_seen_beacon') ||
+                     event.target.closest('[data-testid="slider_item"]') ||
+                     event.target.closest('.cardOutline') ||
+                     event.target.closest('.jcs-JobTitle');
+      
+      if (jobCard) {
+        console.log('Indeed: Job card clicked, will re-extract in 1 second');
+        setTimeout(detectAndExtract, 1000);
+      }
+    }, true);
+    
+    // Method 2: Watch for DOM changes in the job details area  
+    const observeJobDetails = () => {
+      const jobDetailsContainer = document.querySelector('.jobsearch-RightPane') ||
+                                 document.querySelector('[id*="jobDetails"]') ||
+                                 document.querySelector('.jobsearch-ViewJobLayout-content');
+      
+      if (jobDetailsContainer) {
+        const observer = new MutationObserver((mutations) => {
+          // Check if the job title changed
+          const currentTitle = extractRole();
+          if (currentTitle && currentTitle !== lastJobTitle && lastJobTitle !== '') {
+            console.log('Indeed: Job changed from', lastJobTitle, 'to', currentTitle);
+            lastJobTitle = currentTitle;
+            setTimeout(detectAndExtract, 500);
+          } else if (currentTitle && lastJobTitle === '') {
+            lastJobTitle = currentTitle;
+          }
+        });
+        
+        observer.observe(jobDetailsContainer, {
+          childList: true,
+          subtree: true,
+          characterData: true
+        });
+        
+        console.log('Indeed: Started observing job details panel for changes');
+      }
+    };
+    
+    // Start observing after page loads
+    setTimeout(observeJobDetails, 2000);
+  }
+  
+  // Naukri, Hirist, Wellfound: Watch for URL changes (they seem to update URLs)
+  if (url.includes('naukri.com') || url.includes('hirist.tech') || url.includes('wellfound.com')) {
+    setTimeout(detectAndExtract, 2000);
+    
+    let lastUrl = window.location.href;
+    const urlObserver = setInterval(() => {
+      const currentUrl = window.location.href;
+      
+      // For Wellfound, also check job_listing_slug parameter changes
+      if (url.includes('wellfound.com')) {
+        const lastSlug = new URL(lastUrl).searchParams.get('job_listing_slug');
+        const currentSlug = new URL(currentUrl).searchParams.get('job_listing_slug');
+        
+        if (currentSlug && currentSlug !== lastSlug) {
+          console.log('Wellfound: Job listing changed from', lastSlug, 'to', currentSlug);
+          lastUrl = currentUrl;
+          setTimeout(detectAndExtract, 1500);
+        }
+      } else if (currentUrl !== lastUrl) {
+        // For Naukri and Hirist, check full URL
+        lastUrl = currentUrl;
+        console.log('URL changed, re-extracting job details');
+        setTimeout(detectAndExtract, 1500);
+      }
+    }, 1000);
+  }
+  
+  // Smart Apply pages (Indeed/Glassdoor unified): Watch for job header changes
+  if (url.includes('smartapply.indeed.com') || 
+      url.includes('smartapply.glassdoor.com') ||
+      url.includes('/indeedapply/')) {
+    
+    console.log('Smart Apply page detected - setting up monitoring');
+    setTimeout(detectAndExtract, 2000);
+    
+    // Track last job to detect changes
+    let lastCompany = '';
+    let lastRole = '';
+    
+    // Watch for DOM changes in the job header
+    const observeJobHeader = () => {
+      const jobHeaderContainer = document.querySelector('.ia-JobHeader') ||
+                                document.querySelector('[class*="JobHeader"]') ||
+                                document.querySelector('body');
+      
+      if (jobHeaderContainer) {
+        const observer = new MutationObserver((mutations) => {
+          // Check if company or role changed
+          const currentCompany = extractCompany();
+          const currentRole = extractRole();
+          
+          const jobChanged = (currentCompany && currentCompany !== lastCompany && lastCompany !== '') ||
+                            (currentRole && currentRole !== lastRole && lastRole !== '');
+          
+          if (jobChanged) {
+            console.log('Smart Apply: Job changed!');
+            console.log('  Previous:', lastCompany, '-', lastRole);
+            console.log('  Current:', currentCompany, '-', currentRole);
+            
+            lastCompany = currentCompany;
+            lastRole = currentRole;
+            
+            // Re-extract and notify
+            setTimeout(detectAndExtract, 500);
+          } else if (currentCompany && currentRole && lastCompany === '' && lastRole === '') {
+            // Initial load
+            lastCompany = currentCompany;
+            lastRole = currentRole;
+          }
+        });
+        
+        observer.observe(jobHeaderContainer, {
+          childList: true,
+          subtree: true,
+          characterData: true
+        });
+        
+        console.log('Smart Apply: Started observing job header for changes');
+      }
+    };
+    
+    // Start observing after page loads
+    setTimeout(observeJobHeader, 2000);
+    
+    // Also watch for URL hash changes (navigation between form pages)
+    window.addEventListener('hashchange', () => {
+      console.log('Smart Apply: Hash changed, checking for job changes');
+      setTimeout(detectAndExtract, 1000);
+    });
+    
+    // Watch for navigation within Smart Apply
+    let lastFormPage = window.location.href;
+    const formPageObserver = setInterval(() => {
+      if (window.location.href !== lastFormPage) {
+        lastFormPage = window.location.href;
+        console.log('Smart Apply: Form page changed');
+        setTimeout(detectAndExtract, 1000);
       }
     }, 1000);
   }
