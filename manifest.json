@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Job Application Tracker",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Track job applications across LinkedIn, Indeed, Glassdoor, Naukri & more. Auto-detect jobs, manage status, never lose track again.",
   "permissions": [ 
     "storage",
